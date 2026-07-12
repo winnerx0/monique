@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -32,9 +33,9 @@ func dbPath() (string, error) {
 }
 
 func main() {
-	if len(os.Args) < 2 {
-		usage()
-		os.Exit(1)
+	cmd := ""
+	if len(os.Args) > 1 {
+		cmd = os.Args[1]
 	}
 
 	path, err := dbPath()
@@ -50,7 +51,9 @@ func main() {
 	}
 	defer db.Close()
 
-	switch os.Args[1] {
+	switch cmd {
+	case "":
+		runBoth(db)
 	case "track":
 		runTrack(db)
 	case "ui":
@@ -62,7 +65,33 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: monique <track|ui>")
+	fmt.Fprintln(os.Stderr, "usage: monique [track|ui]  (no args: track + ui together)")
+}
+
+// runBoth tracks and shows the UI in one process. Don't run this alongside a
+// separate `monique track` — two trackers fight over the open session.
+func runBoth(db *storage.SQLite) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	trackErr := make(chan error, 1)
+	go func() {
+		trackErr <- tracker.New(collector.New(), db).Run(ctx)
+	}()
+
+	m := tui.New(stats.New(db))
+	_, uiErr := tea.NewProgram(m, tea.WithAltScreen()).Run()
+
+	cancel()          // stop the tracker; it closes the open session on its way out
+	err := <-trackErr // wait so the final UPDATE lands before db.Close
+	if uiErr != nil {
+		fmt.Fprintln(os.Stderr, "monique ui:", uiErr)
+		os.Exit(1)
+	}
+	if err != nil && !errors.Is(err, context.Canceled) {
+		fmt.Fprintln(os.Stderr, "monique track:", err)
+		os.Exit(1)
+	}
 }
 
 func runTrack(db *storage.SQLite) {

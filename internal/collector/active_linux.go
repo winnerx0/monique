@@ -66,7 +66,7 @@ func x11ActiveWindow(ctx context.Context) (domain.FocusEvent, bool, error) {
 	}
 
 	var title, class string
-	for _, line := range strings.Split(string(propOut), "\n") {
+	for line := range strings.SplitSeq(string(propOut), "\n") {
 		vals := xpropStringRe.FindAllStringSubmatch(line, -1)
 		switch {
 		case strings.HasPrefix(line, "_NET_WM_NAME") && len(vals) > 0:

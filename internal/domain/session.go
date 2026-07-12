@@ -28,6 +28,15 @@ type AppTotal struct {
 	DurationSeconds int64
 }
 
+// DayTotal is total focused time for one calendar day, plus that day's
+// most-active app.
+type DayTotal struct {
+	Date            string // YYYY-MM-DD, local time
+	DurationSeconds int64
+	TopApp          string // most-used app that day ("" if none)
+	TopAppSeconds   int64  // that app's time that day
+}
+
 // Collector produces focus-change events (e.g. from the Hyprland IPC socket).
 type Collector interface {
 	Events(ctx context.Context) (<-chan FocusEvent, error)
@@ -47,4 +56,7 @@ type Repository interface {
 	// TimeByApp returns total focused duration per app since the given time,
 	// including any time accrued by the currently-open session.
 	TimeByApp(ctx context.Context, since int64, now int64) ([]AppTotal, error)
+	// TimeByDay returns total focused duration per local calendar day since
+	// the given time, including the currently-open session.
+	TimeByDay(ctx context.Context, since int64, now int64) ([]DayTotal, error)
 }

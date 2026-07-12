@@ -103,3 +103,45 @@ func (s *SQLite) TimeByApp(ctx context.Context, since int64, now int64) ([]domai
 	}
 	return out, rows.Err()
 }
+
+func (s *SQLite) TimeByDay(ctx context.Context, since int64, now int64) ([]domain.DayTotal, error) {
+	// Per day: the total across all apps, plus the single most-used app that
+	// day and its own time. per_app aggregates each app's daily time; day_top
+	// picks the busiest app per day; we join it back to the day total.
+	rows, err := s.db.QueryContext(ctx, `
+		WITH per_app AS (
+			SELECT date(started_at, 'unixepoch', 'localtime') AS day,
+			       app_class,
+			       SUM(COALESCE(duration_seconds, ? - started_at)) AS app_total
+			FROM focus_sessions
+			WHERE started_at >= ?
+			GROUP BY day, app_class
+		),
+		day_top AS (
+			SELECT day, app_class AS top_app, app_total AS top_total,
+			       ROW_NUMBER() OVER (PARTITION BY day ORDER BY app_total DESC) AS rn
+			FROM per_app
+		)
+		SELECT p.day, SUM(p.app_total) AS total,
+		       COALESCE(t.top_app, '') AS top_app,
+		       COALESCE(t.top_total, 0) AS top_total
+		FROM per_app p
+		LEFT JOIN day_top t ON t.day = p.day AND t.rn = 1
+		GROUP BY p.day
+		ORDER BY p.day
+	`, now, since)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []domain.DayTotal
+	for rows.Next() {
+		var t domain.DayTotal
+		if err := rows.Scan(&t.Date, &t.DurationSeconds, &t.TopApp, &t.TopAppSeconds); err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
