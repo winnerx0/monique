@@ -57,7 +57,9 @@ func main() {
 	case "track":
 		runTrack(db)
 	case "ui":
-		runUI(db)
+		runUI(db, false)
+	case "chart":
+		runUI(db, true)
 	default:
 		usage()
 		os.Exit(1)
@@ -65,7 +67,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: monique [track|ui]  (no args: track + ui together)")
+	fmt.Fprintln(os.Stderr, "usage: monique [track|ui|chart]  (no args: track + ui together)")
 }
 
 // runBoth tracks and shows the UI in one process. Don't run this alongside a
@@ -79,7 +81,7 @@ func runBoth(db *storage.SQLite) {
 		trackErr <- tracker.New(collector.New(), db).Run(ctx)
 	}()
 
-	m := tui.New(stats.New(db))
+	m := tui.New(stats.New(db), false)
 	_, uiErr := tea.NewProgram(m, tea.WithAltScreen()).Run()
 
 	cancel()          // stop the tracker; it closes the open session on its way out
@@ -105,8 +107,9 @@ func runTrack(db *storage.SQLite) {
 	}
 }
 
-func runUI(db *storage.SQLite) {
-	m := tui.New(stats.New(db))
+// runUI opens the viewer. chart selects the weekly chart as the start view.
+func runUI(db *storage.SQLite, chart bool) {
+	m := tui.New(stats.New(db), chart)
 	if _, err := tea.NewProgram(m, tea.WithAltScreen()).Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "monique ui:", err)
 		os.Exit(1)

@@ -46,7 +46,9 @@ type Model struct {
 	err      error
 }
 
-func New(stats *stats.Store) Model {
+// New builds the model. When chart is true it opens on the weekly chart
+// instead of the live activity log.
+func New(stats *stats.Store, chart bool) Model {
 	t := table.New(
 		table.WithColumns([]table.Column{
 			{Title: "Started", Width: 8},
@@ -56,7 +58,12 @@ func New(stats *stats.Store) Model {
 		}),
 		table.WithFocused(false),
 	)
-	return Model{stats: stats, table: t, days: 7, viewport: viewport.New(0, 0)}
+	m := Model{stats: stats, table: t, days: 7, viewport: viewport.New(0, 0)}
+	if chart {
+		m.view = viewWeek
+		m.weekJump = true // land on today once the first data arrives
+	}
+	return m
 }
 
 func (m Model) Init() tea.Cmd {
