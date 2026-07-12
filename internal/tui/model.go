@@ -28,7 +28,7 @@ const (
 )
 
 type refreshMsg struct {
-	totals []domain.AppTotal
+	events []domain.EventRow
 	week   []domain.DayTotal
 	err    error
 }
@@ -49,9 +49,10 @@ type Model struct {
 func New(stats *stats.Store) Model {
 	t := table.New(
 		table.WithColumns([]table.Column{
+			{Title: "Started", Width: 8},
 			{Title: "App", Width: 14},
 			{Title: "Window", Width: 40},
-			{Title: "Time today", Width: 12},
+			{Title: "For", Width: 10},
 		}),
 		table.WithFocused(false),
 	)
@@ -67,12 +68,12 @@ func (m Model) Init() tea.Cmd {
 func (m Model) refresh() tea.Cmd {
 	return func() tea.Msg {
 		ctx := context.Background()
-		totals, err := m.stats.Today(ctx)
+		events, err := m.stats.Recent(ctx, 100)
 		if err != nil {
 			return refreshMsg{err: err}
 		}
 		week, err := m.stats.LastDays(ctx, m.days)
-		return refreshMsg{totals: totals, week: week, err: err}
+		return refreshMsg{events: events, week: week, err: err}
 	}
 }
 
@@ -115,9 +116,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.err = nil
-		rows := make([]table.Row, 0, len(msg.totals))
-		for _, t := range msg.totals {
-			rows = append(rows, table.Row{t.AppClass, t.Title, formatDuration(t.DurationSeconds)})
+		rows := make([]table.Row, 0, len(msg.events))
+		for _, e := range msg.events {
+			started := time.Unix(e.StartedAt, 0).Format("15:04:05")
+			dur := formatDuration(e.DurationSeconds)
+			if e.Open {
+				started = "▶ " + time.Unix(e.StartedAt, 0).Format("15:04")
+			}
+			rows = append(rows, table.Row{started, e.AppClass, e.Title, dur})
 		}
 		m.table.SetRows(rows)
 		m.week = msg.week
@@ -146,7 +152,7 @@ func (m Model) View() string {
 	case viewWeek:
 		body = titleStyle.Render(fmt.Sprintf("monique — last %d days", m.days)) + "\n" + m.viewport.View()
 	default:
-		body = titleStyle.Render("monique — time today") + "\n" + m.table.View()
+		body = titleStyle.Render("monique — live activity") + "\n" + m.table.View()
 	}
 	if m.err != nil {
 		body += "\n" + m.err.Error()

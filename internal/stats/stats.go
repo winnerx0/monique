@@ -16,12 +16,9 @@ func New(repo domain.Repository) *Store {
 	return &Store{repo: repo}
 }
 
-// Today returns total focused time per app since midnight, including time
-// accrued by the currently-open session.
-func (s *Store) Today(ctx context.Context) ([]domain.AppTotal, error) {
-	now := time.Now()
-	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	return s.repo.TimeByApp(ctx, startOfDay.Unix(), now.Unix())
+// Recent returns the latest focus events (newest first) for the live log.
+func (s *Store) Recent(ctx context.Context, limit int) ([]domain.EventRow, error) {
+	return s.repo.RecentEvents(ctx, time.Now().Unix(), limit)
 }
 
 // LastDays returns total focused time per day for the last n days (today

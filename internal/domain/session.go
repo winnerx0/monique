@@ -21,11 +21,14 @@ type Session struct {
 	DurationSeconds *int64
 }
 
-// AppTotal is an aggregated total for one app/title.
-type AppTotal struct {
+// EventRow is one focus event for the live activity log: when it started,
+// what got focused, how long it lasted (live for the still-open one).
+type EventRow struct {
+	StartedAt       int64
 	AppClass        string
 	Title           string
 	DurationSeconds int64
+	Open            bool // true for the currently-focused session
 }
 
 // DayTotal is total focused time for one calendar day, plus that day's
@@ -53,9 +56,9 @@ type Repository interface {
 	// RecoverDangling closes any session left open from a previous crash,
 	// using its own last_seen_at as the end time.
 	RecoverDangling(ctx context.Context) error
-	// TimeByApp returns total focused duration per app since the given time,
-	// including any time accrued by the currently-open session.
-	TimeByApp(ctx context.Context, since int64, now int64) ([]AppTotal, error)
+	// RecentEvents returns the most recent focus events, newest first, with
+	// the currently-open session's duration computed live against now.
+	RecentEvents(ctx context.Context, now int64, limit int) ([]EventRow, error)
 	// TimeByDay returns total focused duration per local calendar day since
 	// the given time, including the currently-open session.
 	TimeByDay(ctx context.Context, since int64, now int64) ([]DayTotal, error)

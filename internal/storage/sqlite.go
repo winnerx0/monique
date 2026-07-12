@@ -80,26 +80,27 @@ func (s *SQLite) RecoverDangling(ctx context.Context) error {
 	return err
 }
 
-func (s *SQLite) TimeByApp(ctx context.Context, since int64, now int64) ([]domain.AppTotal, error) {
+func (s *SQLite) RecentEvents(ctx context.Context, now int64, limit int) ([]domain.EventRow, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT app_class, title, SUM(COALESCE(duration_seconds, ? - started_at)) AS total
+		SELECT started_at, app_class, title,
+		       COALESCE(duration_seconds, ? - started_at) AS dur,
+		       ended_at IS NULL AS open
 		FROM focus_sessions
-		WHERE started_at >= ?
-		GROUP BY app_class, title
-		ORDER BY total DESC
-	`, now, since)
+		ORDER BY started_at DESC
+		LIMIT ?
+	`, now, limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var out []domain.AppTotal
+	var out []domain.EventRow
 	for rows.Next() {
-		var t domain.AppTotal
-		if err := rows.Scan(&t.AppClass, &t.Title, &t.DurationSeconds); err != nil {
+		var e domain.EventRow
+		if err := rows.Scan(&e.StartedAt, &e.AppClass, &e.Title, &e.DurationSeconds, &e.Open); err != nil {
 			return nil, err
 		}
-		out = append(out, t)
+		out = append(out, e)
 	}
 	return out, rows.Err()
 }
