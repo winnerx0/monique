@@ -1,0 +1,36 @@
+name: Deploy
+
+on:
+  push:
+    tags: 
+      - 'v*'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [linux, windows, darwin]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: 'go.mod'
+      - name: Vet
+        run: go vet ./...
+      - name: Build
+        run: |
+          mkdir -p dist
+        
+            GOOS=${{ matrix.os }} \
+            go build \
+              -o dist/monique-${{ github.ref_name }}-${{ matrix.os }} \
+              ./cmd/monique/main.go
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+            
