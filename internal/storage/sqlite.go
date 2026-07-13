@@ -74,6 +74,12 @@ func (s *SQLite) CloseOpenSession(ctx context.Context, at int64) error {
 	return err
 }
 
+func (s *SQLite) DeleteBefore(ctx context.Context, cutoff int64) error {
+	_, err := s.db.ExecContext(ctx,
+		`DELETE FROM focus_sessions WHERE started_at < ?`, cutoff)
+	return err
+}
+
 func (s *SQLite) RecoverDangling(ctx context.Context) error {
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE focus_sessions SET ended_at = last_seen_at, duration_seconds = last_seen_at - started_at WHERE ended_at IS NULL`)

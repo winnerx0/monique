@@ -8,7 +8,11 @@ import (
 	"monique/internal/domain"
 )
 
-const heartbeatInterval = 30 * time.Second
+const (
+	heartbeatInterval = 30 * time.Second
+	purgeInterval     = 24 * time.Hour
+	retentionDays     = 30
+)
 
 type Tracker struct {
 	collector domain.Collector
@@ -27,6 +31,9 @@ func (t *Tracker) Run(ctx context.Context) error {
 	if err := t.repo.RecoverDangling(ctx); err != nil {
 		return err
 	}
+	if err := t.purge(ctx); err != nil { // prune once at startup (covers daily restarts)
+		return err
+	}
 
 	events, err := t.collector.Events(ctx)
 	if err != nil {
@@ -35,6 +42,9 @@ func (t *Tracker) Run(ctx context.Context) error {
 
 	ticker := time.NewTicker(heartbeatInterval)
 	defer ticker.Stop()
+
+	purgeTicker := time.NewTicker(purgeInterval)
+	defer purgeTicker.Stop()
 
 	for {
 		select {
@@ -55,8 +65,20 @@ func (t *Tracker) Run(ctx context.Context) error {
 			if err := t.repo.Heartbeat(ctx, time.Now().Unix()); err != nil {
 				return err
 			}
+		case <-purgeTicker.C:
+			// Best-effort: a failed cleanup shouldn't kill live tracking.
+			_ = t.purge(ctx)
 		case <-ctx.Done():
 			return t.repo.CloseOpenSession(context.Background(), time.Now().Unix())
 		}
 	}
+}
+
+// purge deletes events older than the retention window (30 days before the
+// start of today).
+func (t *Tracker) purge(ctx context.Context) error {
+	now := time.Now()
+	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	cutoff := startOfDay.AddDate(0, 0, -retentionDays).Unix()
+	return t.repo.DeleteBefore(ctx, cutoff)
 }

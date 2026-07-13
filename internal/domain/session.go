@@ -56,6 +56,9 @@ type Repository interface {
 	// RecoverDangling closes any session left open from a previous crash,
 	// using its own last_seen_at as the end time.
 	RecoverDangling(ctx context.Context) error
+	// DeleteBefore removes sessions that started before the given time
+	// (retention pruning).
+	DeleteBefore(ctx context.Context, cutoff int64) error
 	// RecentEvents returns the most recent focus events, newest first, with
 	// the currently-open session's duration computed live against now.
 	RecentEvents(ctx context.Context, now int64, limit int) ([]EventRow, error)
