@@ -56,7 +56,9 @@ func New(stats *stats.Store, chart bool) Model {
 			{Title: "Window", Width: 40},
 			{Title: "For", Width: 10},
 		}),
-		table.WithFocused(false),
+		table.WithFocused(true), // focused so ↑/↓/PgUp/PgDn scroll the log
+		table.WithHeight(20),
+		table.WithStyles(liveTableStyles()),
 	)
 	m := Model{stats: stats, table: t, days: 7, viewport: viewport.New(0, 0)}
 	if chart {
@@ -94,7 +96,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
-		case "a":
+		case "c":
 			if m.view == viewWeek { // already on the chart: toggle range
 				if m.days == 7 {
 					m.days = 30
@@ -111,9 +113,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case tea.WindowSizeMsg:
 		// Reserve rows for the title, help line and a little padding.
-		m.viewport.Width = msg.Width
 		if h := msg.Height - 4; h > 0 {
+			m.viewport.Width = msg.Width
 			m.viewport.Height = h
+			m.table.SetHeight(h)
 		}
 	case tickMsg:
 		return m, tea.Batch(m.refresh(), tick())
@@ -144,13 +147,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Remaining messages (arrow keys, page up/down) scroll the chart.
+	// Remaining messages (arrow keys, page up/down) scroll the active view.
+	var cmd tea.Cmd
 	if m.view == viewWeek {
-		var cmd tea.Cmd
 		m.viewport, cmd = m.viewport.Update(msg)
-		return m, cmd
+	} else {
+		m.table, cmd = m.table.Update(msg)
 	}
-	return m, nil
+	return m, cmd
 }
 
 func (m Model) View() string {
@@ -164,7 +168,7 @@ func (m Model) View() string {
 	if m.err != nil {
 		body += "\n" + m.err.Error()
 	}
-	return body + helpStyle.Render("a: chart (again: 7/30 days) · ↑/↓ scroll · l: live · q: quit")
+	return body + helpStyle.Render("c: chart (again: 7/30 days) · ↑/↓ scroll · l: live · q: quit")
 }
 
 func (m Model) weekView() string {
