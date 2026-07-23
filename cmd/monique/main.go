@@ -14,7 +14,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"monique/internal/collector"
-	"monique/internal/stats"
 	"monique/internal/storage"
 	"monique/internal/tracker"
 	"monique/internal/tui"
@@ -81,7 +80,7 @@ func runBoth(db *storage.SQLite) {
 		trackErr <- tracker.New(collector.New(), db).Run(ctx)
 	}()
 
-	m := tui.New(stats.New(db), false)
+	m := tui.New(db, false)
 	_, uiErr := tea.NewProgram(m, tea.WithAltScreen()).Run()
 
 	cancel()          // stop the tracker; it closes the open session on its way out
@@ -109,7 +108,7 @@ func runTrack(db *storage.SQLite) {
 
 // runUI opens the viewer. chart selects the weekly chart as the start view.
 func runUI(db *storage.SQLite, chart bool) {
-	m := tui.New(stats.New(db), chart)
+	m := tui.New(db, chart)
 	if _, err := tea.NewProgram(m, tea.WithAltScreen()).Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "monique ui:", err)
 		os.Exit(1)

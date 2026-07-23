@@ -9,18 +9,6 @@ type FocusEvent struct {
 	PID      int
 }
 
-// Session is one continuous period a window held focus.
-type Session struct {
-	ID              int64
-	AppClass        string
-	Title           string
-	PID             int
-	StartedAt       int64
-	LastSeenAt      int64
-	EndedAt         *int64
-	DurationSeconds *int64
-}
-
 // EventRow is one focus event for the live activity log: when it started,
 // what got focused, how long it lasted (live for the still-open one).
 type EventRow struct {
